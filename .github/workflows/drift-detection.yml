@@ -41,4 +41,28 @@ jobs:
         run: terraform init -input=false
 
       - name: Terraform Plan (Drift Detection)
-        run: terraform plan -input=false -no-color -detailed-exitcode
+        id: plan
+        working-directory: ${{ inputs.tf_working_dir }}
+        run: |
+            set +e
+            terraform plan -input=false -no-color -detailed-exitcode > plan.txt
+            echo "exit_code=$?" >> $GITHUB_OUTPUT
+            exit 0
+
+      - name: Upload plan output
+        uses: actions/upload-artifact@v4
+        with:
+          path: ${{ inputs.tf_working_dir }}/plan.txt
+          name: terraform-plan
+
+
+      - name: Check Detected
+        if: steps.plan.outputs.exit_code == '2'
+        run: |
+          echo "Terraform drift detected!"
+          exit 1
+        
+      - name: No Drift Detected
+        if: steps.plan.outputs.exit_code == '0'
+        run: |
+          echo "No drift detected."
