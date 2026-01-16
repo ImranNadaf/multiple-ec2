@@ -1,9 +1,16 @@
 name: Terraform Drift Detection
 
 on:
-  schedule:
-    - cron: "0 6 * * *"
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tf_working_dir:
+        required: false
+        type: string
+        default: "."
+      aws_region:
+        required: false
+        type: string
+        default: "us-east-2"
 
 jobs:
   drift-check:
@@ -30,6 +37,7 @@ jobs:
         run: cat terraform.tfvars
 
       - name: Terraform Init
+        working-directory: ${{ inputs.tf_working_dir }}
         run: terraform init -input=false
 
       - name: Terraform Plan (Drift Detection)

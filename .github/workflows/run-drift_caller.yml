@@ -1,0 +1,14 @@
+name: Run Drift Detection
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  drift:
+    uses: ./.github/workflows/drift-detection.yml
+    with:
+      tf_working_dir: "."
+      aws_region: "us-east-2"
+    secrets: inherit
