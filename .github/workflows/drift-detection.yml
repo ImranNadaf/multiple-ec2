@@ -15,6 +15,10 @@ on:
 jobs:
   drift-check:
     runs-on: ubuntu-latest
+    permissions:
+        contents: read
+        issues: write
+
 
     steps:
       - name: Checkout Repo
@@ -55,13 +59,32 @@ jobs:
           path: ${{ inputs.tf_working_dir }}/plan.txt
           name: terraform-plan
 
-
-      - name: Check Detected
+      - name: Drift detected
         if: steps.plan.outputs.exit_code == '2'
         run: |
-          echo "Terraform drift detected!"
-          exit 1
-        
+         echo "Drift detected! Terraform plan shows changes."
+         exit 1
+
+      - name: Create GitHub Issue on Drift
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const Title = "Terraform Drift Detected";
+            const Body = "Terraform plan has detected drift in the infrastructure. Please review the attached plan output for details.";
+            
+            - Repo: ${context.repo.owner}/${context.repo.repo}
+            - Workflow: ${context.workflow}
+            - Run: ${context.runId}
+
+            
+            await github.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: Title,
+              body: Body
+            });
+
       - name: No Drift Detected
         if: steps.plan.outputs.exit_code == '0'
         run: |
