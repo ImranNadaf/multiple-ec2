@@ -16,9 +16,8 @@ jobs:
   drift-check:
     runs-on: ubuntu-latest
     permissions:
-        contents: read
-        issues: write
-
+      contents: read
+      issues: write
 
     steps:
       - name: Checkout Repo
@@ -32,78 +31,57 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
-
-      - name: Debug - list files
-        run: ls -la
-
-      - name: Debug - show tfvars file
-        working-directory: ${{ inputs.tf_working_dir }}
-        run: cat terraform.tfvars
+          aws-region: ${{ inputs.aws_region }}
 
       - name: Terraform Init
         working-directory: ${{ inputs.tf_working_dir }}
         run: terraform init -input=false
-      - name: Debug - backend info
-        run: terraform providers
-
-      - name: Debug - pull remote state
-        run: terraform state pull | head -n 30
-
-
-      - name: Debug - terraform init backend
-        working-directory: ${{ inputs.tf_working_dir }}
-        run: terraform providers
-
-      - name: Debug - terraform state pull
-        working-directory: ${{ inputs.tf_working_dir }}
-        run: terraform state pull | head -n 20
-
-
 
       - name: Terraform Plan (Drift Detection)
         id: plan
+        working-directory: ${{ inputs.tf_working_dir }}
         run: |
           set +e
           terraform plan -input=false -no-color -detailed-exitcode > plan.txt
           exit_code=$?
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
-          echo "Terraform plan exit code = $exit_code"
           exit 0
 
       - name: Upload plan output
         uses: actions/upload-artifact@v4
         with:
-          path: ${{ inputs.tf_working_dir }}/plan.txt
           name: terraform-plan
-
-      - name: Drift detected
-        if: steps.plan.outputs.exit_code == '2'
-        run: |
-         echo "Drift detected! Terraform plan shows changes."
-         exit 1
+          path: ${{ inputs.tf_working_dir }}/plan.txt
 
       - name: Create GitHub Issue on Drift
         if: steps.plan.outputs.exit_code == '2'
         uses: actions/github-script@v7
         with:
           script: |
-            const Title = "Terraform Drift Detected";
-            const Body = "Terraform plan has detected drift in the infrastructure. Please review the attached plan output for details.";
+            const title = "⚠️ Terraform Drift Detected";
+            const body = `Terraform plan has detected drift in the infrastructure.
             
-            - Repo: ${context.repo.owner}/${context.repo.repo}
-            - Workflow: ${context.workflow}
-            - Run ID: ${context.runId}
-
+            - **Repo:** ${context.repo.owner}/${context.repo.repo}
+            - **Workflow:** ${context.workflow}
+            - **Run ID:** [${context.runId}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
             
-            await github.issues.create({
+            Please review the attached plan artifact for details.`;
+            
+            await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: Title,
-              body: Body
+              title: title,
+              body: body
             });
 
-      - name: No Drift Detected
-        if: steps.plan.outputs.exit_code == '0'
+      - name: Report Status
         run: |
-          echo "No drift detected."
+          if [ "${{ steps.plan.outputs.exit_code }}" == "2" ]; then
+            echo "Drift detected! Marking job as failed."
+            exit 1
+          elif [ "${{ steps.plan.outputs.exit_code }}" == "0" ]; then
+            echo "No drift detected."
+          else
+            echo "Terraform plan failed with error."
+            exit 1
+          fi
