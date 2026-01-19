@@ -8,6 +8,9 @@ on:
 
 jobs:
   drift:
+    permissions:
+      contents: read
+      issues: write
     uses: ./.github/workflows/drift-detection.yml
     with:
       tf_working_dir: "."
