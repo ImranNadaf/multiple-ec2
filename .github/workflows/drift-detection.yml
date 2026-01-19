@@ -44,7 +44,13 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ inputs.tf_working_dir }}
         run: terraform init -input=false
+      - name: Debug - backend info
+        run: terraform providers
 
+      - name: Debug - pull remote state
+        run: terraform state pull | head -n 30
+
+        
       - name: Debug - terraform init backend
         working-directory: ${{ inputs.tf_working_dir }}
         run: terraform providers
