@@ -78,7 +78,7 @@ jobs:
 
       - name: Create GitHub Issue on Drift
         if: steps.plan.outputs.exit_code == '2'
-        uses: github.rest.issues.create
+        uses: actions/github-script@v7
         with:
           script: |
             const Title = "Terraform Drift Detected";
@@ -86,7 +86,7 @@ jobs:
             
             - Repo: ${context.repo.owner}/${context.repo.repo}
             - Workflow: ${context.workflow}
-            - Run: ${context.runId}
+            - Run ID: ${context.runId}
 
             
             await github.issues.create({
