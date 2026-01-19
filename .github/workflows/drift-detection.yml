@@ -25,6 +25,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false # Required to capture exact exit codes
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -42,9 +44,14 @@ jobs:
         working-directory: ${{ inputs.tf_working_dir }}
         run: |
           set +e
+          # Generate plan and capture detailed exit code
           terraform plan -input=false -no-color -detailed-exitcode > plan.txt
           exit_code=$?
+          
+          # Pass the exit code to GitHub Actions outputs
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+          
+          echo "Terraform plan finished with exit code: $exit_code"
           exit 0
 
       - name: Upload plan output
@@ -74,14 +81,16 @@ jobs:
               body: body
             });
 
-      - name: Report Status
+      - name: Final Status Check
+        working-directory: ${{ inputs.tf_working_dir }}
         run: |
           if [ "${{ steps.plan.outputs.exit_code }}" == "2" ]; then
-            echo "Drift detected! Marking job as failed."
+            echo "DRIFT DETECTED: Plan shows changes."
             exit 1
           elif [ "${{ steps.plan.outputs.exit_code }}" == "0" ]; then
-            echo "No drift detected."
+            echo "SUCCESS: No drift detected."
+            exit 0
           else
-            echo "Terraform plan failed with error."
+            echo "ERROR: Terraform plan failed with exit code ${{ steps.plan.outputs.exit_code }}."
             exit 1
           fi
